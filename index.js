@@ -1,13 +1,14 @@
 const { Telegraf } = require("telegraf");
 const { Client } = require("pg");
-const bot = new Telegraf("6587658597:AAGmb4hjANj1N8js_OmjfTT57ElbABR_bJ0");
+const dotenv = require("dotenv");
+dotenv.config();
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
 const fs = require("fs");
 const { parse } = require("csv-parse");
 
 const client = new Client({
-  connectionString:
-    "postgres://postgres:F5aFdC2bG*1B*e43*A2*bF-133EdDCA4@monorail.proxy.rlwy.net:46391/railway",
+  connectionString: process.env.PG_DATABASE,
 });
 client.connect();
 client.query(
