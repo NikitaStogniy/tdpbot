@@ -219,6 +219,27 @@ setInterval(async () => {
   if (newId > lastId) {
     lastId = newId;
 
+    const users = await client.query("SELECT * FROM users");
+    const newProperty = await client.query(
+      "SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count FROM property WHERE id = $1 GROUP BY clusternumber, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count",
+      [newId]
+    );
+    let message = `${newProperty.rows[0].city}, ${
+      newProperty.rows[0].district
+    }, ${newProperty.rows[0].street}, до метро: ${
+      newProperty.rows[0].metro_foot_minute
+    }\n Ремонт:${getRepair[newProperty.rows[0].repair]}
+        \n Этаж ${newProperty.rows[0].floor} из ${
+      newProperty.rows[0].floors_count
+    }
+        \n Год постройки до ${newProperty.rows[0].max_house_year}
+        \nОтклонение от медианной стоимости за квадратный метр составляет -5%\n\nПотенциал заработка на квартире ${
+          newProperty.rows[0].min_price_per_m2 *
+          0.05 *
+          newProperty.rows[0].total_meters
+        }\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
+      newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters
+    } рублей \n${newProperty.rows[0].link}`;
     const medianCostWithRepair = await client.query(
       `SELECT MEDIAN(price + 45000 * total_meters) as median_price_with_repair
       FROM property
@@ -239,27 +260,7 @@ setInterval(async () => {
     ) {
       label = "Желтый";
     }
-    const users = await client.query("SELECT * FROM users");
-    const newProperty = await client.query(
-      "SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count FROM property WHERE id = $1 GROUP BY clusternumber, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count",
-      [newId]
-    );
-    const message = `${newProperty.rows[0].city}, ${
-      newProperty.rows[0].district
-    }, ${newProperty.rows[0].street}, до метро: ${
-      newProperty.rows[0].metro_foot_minute
-    }\n Ремонт:${getRepair[newProperty.rows[0].repair]}
-        \n Этаж ${newProperty.rows[0].floor} из ${
-      newProperty.rows[0].floors_count
-    }
-        \n Год постройки до ${newProperty.rows[0].max_house_year}
-        \nОтклонение от медианной стоимости за квадратный метр составляет -5%\n\nПотенциал заработка на квартире ${
-          newProperty.rows[0].min_price_per_m2 *
-          0.05 *
-          newProperty.rows[0].total_meters
-        }\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
-      newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters
-    } рублей \n${newProperty.rows[0].link}\n\n\nЛейбл: ${label}\n\n`;
+    message += `\n\nЛейбл: ${label}\n\n`;
     users.rows.forEach((user) => {
       bot.telegram.sendMessage(user.uid, message);
     });
