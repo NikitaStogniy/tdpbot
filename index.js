@@ -161,7 +161,7 @@ bot.start((ctx) => {
     "Привет! Я бот TODAYPRICE, буду переодически присылать тебе неплохие предложения по недвижимости"
   );
   client.query(
-    `INSERT INTO users (uid) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
+    `INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING`,
     [ctx.from.id],
     (err, res) => {
       if (err) {
@@ -171,38 +171,6 @@ bot.start((ctx) => {
       }
     }
   );
-});
-bot.command("green", async (ctx) => {
-  try {
-    const res = await client.query(
-      `SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count
-      FROM property
-      WHERE price_per_m2 <= (SELECT AVG(price_per_m2) * 0.8 FROM property)
-      GROUP BY clusternumber, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count
-      ORDER BY min_price_per_m2 ASC
-      LIMIT 3`
-    );
-    if (res.rows.length > 0) {
-      let message = "";
-      res.rows.forEach((row, index) => {
-        message += `${row.city}, ${row.district}, ${row.street}, до метро: ${
-          row.metro_foot_minute
-        }\n Ремонт:${getRepair[row.repair]}
-        \n Этаж ${row.floor} из ${row.floors_count}
-        \n Год постройки до ${row.max_house_year}
-        \nОтклонение от медианной стоимости за квадратный метр составляет -20%\n\nПотенциал заработка на квартире ${
-          row.min_price_per_m2 * 0.2 * row.total_meters
-        }\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
-          row.price + 45000 * row.total_meters
-        } рублей \n${row.link}\n\n`;
-      });
-      ctx.reply(message);
-    } else {
-      ctx.reply("Нет подходящих предложений");
-    }
-  } catch (err) {
-    console.error(err);
-  }
 });
 
 const getRepair = {
@@ -241,10 +209,8 @@ setInterval(async () => {
       newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters
     } рублей \n${newProperty.rows[0].link}`;
     const medianCostWithRepair = await client.query(
-      `SELECT MEDIAN(price + 45000 * total_meters) as median_price_with_repair
-      FROM property
-      WHERE repair = 2 AND clusternumber = $1`,
-      [newProperty.rows[0].clusternumber]
+      `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price + 45000 * total_meters) as median_price_with_repair
+      FROM property`
     );
     const repairCost = 45000 * newProperty.rows[0].total_meters;
     const totalCostWithRepair = newProperty.rows[0].price + repairCost;
@@ -266,67 +232,5 @@ setInterval(async () => {
     });
   }
 }, 10000);
-
-bot.command("yellow", async (ctx) => {
-  try {
-    const res = await client.query(
-      `SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count
-      FROM property
-      WHERE price_per_m2 <= (SELECT AVG(price_per_m2) * 0.95 FROM property)
-      GROUP BY clusternumber, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count
-      ORDER BY min_price_per_m2 ASC
-      LIMIT 3`
-    );
-    if (res.rows.length > 0) {
-      let message = "";
-      res.rows.forEach((row, index) => {
-        if (index > 0) {
-          message += `${row.city}, ${row.district}, ${row.street}, до метро: ${
-            row.metro_foot_minute
-          }\n Ремонт:${getRepair[row.repair]}
-        \n Этаж ${row.floor} из ${row.floors_count}
-        \n Год постройки до ${row.max_house_year}
-        \nОтклонение от медианной стоимости за квадратный метр составляет -5%\n\nПотенциал заработка на квартире ${
-          row.min_price_per_m2 * 0.05 * row.total_meters
-        }\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
-            row.price + 45000 * row.total_meters
-          } рублей \n${row.link}\n\n`;
-        }
-      });
-      ctx.reply(message);
-    } else {
-      ctx.reply("Нет подходящих предложений");
-    }
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-// bot.hears("flat", async (ctx) => {
-//   try {
-//     const res = await client.query(
-//       `SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link
-//       FROM property
-//       WHERE price_per_m2 IS NOT NULL
-//       GROUP BY clusternumber, link
-//       ORDER BY min_price_per_m2 ASC
-//       LIMIT 1`
-//     );
-//     if (res.rows.length > 0) {
-//       const row = res.rows[0];
-//       ctx.reply(
-//         `Самая дешевая квартира в кластере ${row.clusternumber}: ${row.link}`
-//       );
-//     } else {
-//       ctx.reply("Нет данных о квартирах");
-//     }
-//   } catch (err) {
-//     console.error(err);
-//   }
-// });
-
-bot.help((ctx) => ctx.reply("Send me a sticker"));
-bot.on("sticker", (ctx) => ctx.reply("👍"));
-bot.hears("hi", (ctx) => ctx.reply("Hey there"));
 
 bot.launch();
