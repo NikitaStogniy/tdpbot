@@ -158,7 +158,7 @@ const clustering = () => {
 
 bot.start((ctx) => {
   ctx.reply(
-    "Привет! Я бот TODAYPRICE, буду переодически присылать тебе неплхие предложения по недвижимости"
+    "Привет! Я бот TODAYPRICE, буду переодически присылать тебе неплохие предложения по недвижимости"
   );
   client.query(
     `INSERT INTO users (uid) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
@@ -218,6 +218,27 @@ setInterval(async () => {
   const newId = res.rows[0].max;
   if (newId > lastId) {
     lastId = newId;
+
+    const medianCostWithRepair = await client.query(
+      `SELECT MEDIAN(price + 45000 * total_meters) as median_price_with_repair
+      FROM property
+      WHERE repair = 2 AND clusternumber = $1`,
+      [newProperty.rows[0].clusternumber]
+    );
+    const repairCost = 45000 * newProperty.rows[0].total_meters;
+    const totalCostWithRepair = newProperty.rows[0].price + repairCost;
+    let label = "";
+    if (
+      totalCostWithRepair <
+      medianCostWithRepair.rows[0].median_price_with_repair
+    ) {
+      label = "Зеленый";
+    } else if (
+      totalCostWithRepair <
+      medianCostWithRepair.rows[0].median_price_with_repair * 0.9
+    ) {
+      label = "Желтый";
+    }
     const users = await client.query("SELECT * FROM users");
     const newProperty = await client.query(
       "SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count FROM property WHERE id = $1 GROUP BY clusternumber, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count",
@@ -238,7 +259,7 @@ setInterval(async () => {
           newProperty.rows[0].total_meters
         }\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
       newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters
-    } рублей \n${newProperty.rows[0].link}\n\n`;
+    } рублей \n${newProperty.rows[0].link}\n\n\nЛейбл: ${label}\n\n`;
     users.rows.forEach((user) => {
       bot.telegram.sendMessage(user.uid, message);
     });
