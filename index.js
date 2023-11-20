@@ -213,6 +213,6 @@ setInterval(async () => {
       console.log("Нет новых предложений");
     }
   }
-}, 300000);
+}, process.env.INTERVAL);
 
 bot.launch();
