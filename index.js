@@ -183,54 +183,169 @@ const getRepair = {
 let lastId = 0;
 setInterval(async () => {
   const res = await client.query("SELECT MAX(id) FROM property");
-  const newId = res.rows[0].max;
+  const newId = res.rows[0].id;
   if (newId > lastId) {
     lastId = newId;
-
     const users = await client.query("SELECT * FROM users");
+
+    const medianClusterCost = await client.query(
+      `SELECT clusternumber, percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2) as median_price_per_m2
+      FROM property
+      GROUP BY clusternumber`
+    );
+
+    //check if last id cost is lower than median cost
+    const lastProperty = await client.query(
+      "SELECT clusternumber, price_per_m2 FROM property WHERE id = $1",
+      [newId]
+    );
+
+    const medianCost = medianClusterCost.rows.find(
+      (cluster) => cluster.clusternumber === lastProperty.rows[0].clusternumber
+    );
+
+    if (
+      lastProperty.rows[0].price_per_m2 <
+      medianCost.median_price_per_m2 * 0.95
+    ) {
+      const newProperty = await client.query(
+        "SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count FROM property WHERE id = $1 GROUP BY clusternumber, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count",
+        [newId]
+      );
+      const percent =
+        ((medianCost.median_price_per_m2 - lastProperty.rows[0].price_per_m2) /
+          medianCost.median_price_per_m2) *
+        100;
+      newProperty.rows[0].min_price_per_m2 *
+        0.05 *
+        newProperty.rows[0].total_meters;
+      let message = `${newProperty.rows[0].city}, ${
+        newProperty.rows[0].district
+      }, ${newProperty.rows[0].street}, до метро: ${
+        newProperty.rows[0].metro_foot_minute
+      }\n Ремонт:${getRepair[newProperty.rows[0].repair]}
+            \n Этаж ${newProperty.rows[0].floor} из ${
+        newProperty.rows[0].floors_count
+      }
+            \n Год постройки до ${newProperty.rows[0].max_house_year}
+            \nОтклонение от медианной стоимости за квадратный метр составляет -${percent.toFixed(
+              1
+            )}%\n\nПотенциал заработка на квартире ${
+        medianCost.median_price_per_m2 * newProperty.rows[0].total_meters +
+        45000 * newProperty.rows[0].total_meters -
+        (newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters)
+      }₽\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
+        newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters
+      }₽ \n${newProperty.rows[0].link}`;
+      const medianCostWithRepair = await client.query(
+        `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price + 45000 * total_meters) as median_price_with_repair
+          FROM property`
+      );
+      const repairCost = 45000 * newProperty.rows[0].total_meters;
+      const totalCostWithRepair = newProperty.rows[0].price + repairCost;
+      let label = "";
+      if (
+        totalCostWithRepair <
+        medianCostWithRepair.rows[0].median_price_with_repair * 0.9
+      ) {
+        label = "Зеленый";
+      } else if (
+        totalCostWithRepair <
+        medianCostWithRepair.rows[0].median_price_with_repair
+      ) {
+        label = "Желтый";
+      } else {
+        label = "Красный (не рекомендуется к покупке)";
+      }
+      message += `\n\nЛейбл: ${label}\n\n`;
+      users.rows.forEach((user) => {
+        bot.telegram.sendMessage(user.uid, message);
+      });
+    }
+  }
+}, 10000);
+
+bot.help(async (ctx) => {
+  const res = await client.query(
+    "SELECT id FROM property ORDER BY RANDOM() LIMIT 1"
+  );
+  const newId = res.rows[0].id;
+  const users = ctx.from.id;
+
+  const medianClusterCost = await client.query(
+    `SELECT clusternumber, percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2) as median_price_per_m2
+      FROM property
+      GROUP BY clusternumber`
+  );
+
+  //check if last id cost is lower than median cost
+  const lastProperty = await client.query(
+    "SELECT clusternumber, price_per_m2 FROM property WHERE id = $1",
+    [newId]
+  );
+
+  const medianCost = medianClusterCost.rows.find(
+    (cluster) => cluster.clusternumber === lastProperty.rows[0].clusternumber
+  );
+
+  if (
+    lastProperty.rows[0].price_per_m2 <
+    medianCost.median_price_per_m2 * 0.95
+  ) {
     const newProperty = await client.query(
       "SELECT clusternumber, MIN(price_per_m2) as min_price_per_m2, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count FROM property WHERE id = $1 GROUP BY clusternumber, link, city, district, street, metro_foot_minute, repair, price, total_meters, price_per_m2, max_house_year, floor, floors_count",
       [newId]
     );
+    const percent =
+      ((medianCost.median_price_per_m2 - lastProperty.rows[0].price_per_m2) /
+        medianCost.median_price_per_m2) *
+      100;
+    newProperty.rows[0].min_price_per_m2 *
+      0.05 *
+      newProperty.rows[0].total_meters;
     let message = `${newProperty.rows[0].city}, ${
       newProperty.rows[0].district
     }, ${newProperty.rows[0].street}, до метро: ${
       newProperty.rows[0].metro_foot_minute
     }\n Ремонт:${getRepair[newProperty.rows[0].repair]}
-        \n Этаж ${newProperty.rows[0].floor} из ${
+          \n Этаж ${newProperty.rows[0].floor} из ${
       newProperty.rows[0].floors_count
     }
-        \n Год постройки до ${newProperty.rows[0].max_house_year}
-        \nОтклонение от медианной стоимости за квадратный метр составляет -5%\n\nПотенциал заработка на квартире ${
-          newProperty.rows[0].min_price_per_m2 *
-          0.05 *
-          newProperty.rows[0].total_meters
-        }\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
+          \n Год постройки до ${newProperty.rows[0].max_house_year}
+          \nОтклонение от медианной стоимости за квадратный метр составляет -${percent.toFixed(
+            1
+          )}%\n\nПотенциал заработка на квартире ${
+      medianCost.median_price_per_m2 * newProperty.rows[0].total_meters +
+      45000 * newProperty.rows[0].total_meters -
+      (newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters)
+    }₽\nПри стоимости ремонта 45тыс. за кв.м. объект на выходе будет стоить ${
       newProperty.rows[0].price + 45000 * newProperty.rows[0].total_meters
-    } рублей \n${newProperty.rows[0].link}`;
+    }₽ \n${newProperty.rows[0].link}`;
     const medianCostWithRepair = await client.query(
       `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price + 45000 * total_meters) as median_price_with_repair
-      FROM property`
+        FROM property`
     );
     const repairCost = 45000 * newProperty.rows[0].total_meters;
     const totalCostWithRepair = newProperty.rows[0].price + repairCost;
     let label = "";
     if (
       totalCostWithRepair <
-      medianCostWithRepair.rows[0].median_price_with_repair
+      medianCostWithRepair.rows[0].median_price_with_repair * 0.9
     ) {
       label = "Зеленый";
     } else if (
       totalCostWithRepair <
-      medianCostWithRepair.rows[0].median_price_with_repair * 0.9
+      medianCostWithRepair.rows[0].median_price_with_repair
     ) {
       label = "Желтый";
+    } else {
+      label = "Красный (не рекомендуется к покупке)";
     }
     message += `\n\nЛейбл: ${label}\n\n`;
-    users.rows.forEach((user) => {
-      bot.telegram.sendMessage(user.uid, message);
-    });
+    bot.telegram.sendMessage(users, message);
+  } else {
+    bot.telegram.sendMessage(users, "Нет новых предложений");
   }
-}, 10000);
+});
 
 bot.launch();
