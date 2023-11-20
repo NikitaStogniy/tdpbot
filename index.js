@@ -209,11 +209,11 @@ setInterval(async () => {
         console.log(bestProperty.rows[0].clusternumber);
         await generateMessage(bestProperty.rows[0]);
       } else {
-        console.log("Нет новых предложений");
+        console.log("Нет новых предложений 1");
       }
     }
   } else {
-    console.log("Нет новых предложений");
+    console.log("Нет новых предложений 2");
   }
 }, 36000);
 
