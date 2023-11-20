@@ -261,7 +261,7 @@ setInterval(async () => {
       users.rows.forEach((user) => {
         bot.telegram.sendMessage(user.uid, message);
       });
-    }
+    } else {console.log('No way')}
   }
 }, 10000);
 
