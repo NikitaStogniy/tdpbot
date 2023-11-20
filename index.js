@@ -261,9 +261,13 @@ setInterval(async () => {
       users.rows.forEach((user) => {
         bot.telegram.sendMessage(user.uid, message);
       });
-    } else {console.log('No way')}
+    } else {
+      console.log("Нет подходящих предложений");
+    }
+  } else {
+    console.log("Нет новых предложений");
   }
-}, 10000);
+}, 6000);
 
 bot.help(async (ctx) => {
   const res = await client.query(
