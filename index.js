@@ -187,34 +187,32 @@ setInterval(async () => {
       (await getMedianM2(checkProperty.clusternumber)) * 0.95
     ) {
       await generateMessage(checkProperty);
-    } else {
-      console.log(`Нет подходящих предложений`);
-      let db;
-      try {
-        db = { id: JSON.parse(fs.readFileSync("db.json")).id };
-      } catch {
-        db = { id: [123, 9321] };
-      }
-      const bestProperty = await client.query(
-        `SELECT *
+    }
+  } else {
+    console.log(`Нет подходящих предложений`);
+    let db;
+    try {
+      db = { id: JSON.parse(fs.readFileSync("db.json")).id };
+    } catch {
+      db = { id: [123, 9321] };
+    }
+    const bestProperty = await client.query(
+      `SELECT *
          FROM property
          WHERE id NOT IN (${db.id.join(",")})
          GROUP BY clusternumber, id
          ORDER BY price_per_m2 ASC
          LIMIT 1`
-      );
-      if (bestProperty.rows.length > 0) {
-        db.id.push(bestProperty.rows[0].id);
-        fs.writeFileSync("db.json", JSON.stringify(db));
-        console.log(bestProperty.rows[0].clusternumber);
-        await generateMessage(bestProperty.rows[0]);
-      } else {
-        console.log("Нет новых предложений 1");
-      }
+    );
+    if (bestProperty.rows.length > 0) {
+      db.id.push(bestProperty.rows[0].id);
+      fs.writeFileSync("db.json", JSON.stringify(db));
+      console.log(bestProperty.rows[0].clusternumber);
+      await generateMessage(bestProperty.rows[0]);
+    } else {
+      console.log("Нет новых предложений");
     }
-  } else {
-    console.log("Нет новых предложений 2");
   }
-}, 36000);
+}, 300000);
 
 bot.launch();
