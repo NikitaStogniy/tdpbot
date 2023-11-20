@@ -97,13 +97,11 @@ async function getMedianM2(clusternumber) {
     GROUP BY clusternumber`,
     [clusternumber]
   );
-  console.log("median", medianM2.rows[0].median_price_per_m2);
   return medianM2.rows[0].median_price_per_m2;
 }
 
 async function getPercent(property) {
   const medianCluster = await getMedianM2(property.clusternumber);
-  console.log("fromPercent", property);
   return (
     (((await medianCluster) - property.price_per_m2) / (await medianCluster)) *
     100
@@ -189,25 +187,28 @@ setInterval(async () => {
       await generateMessage(checkProperty);
     }
   } else {
-    console.log(`Нет подходящих предложений`);
-    let db;
-    try {
-      db = { id: JSON.parse(fs.readFileSync("db.json")).id };
-    } catch {
-      db = { id: [123, 9321] };
-    }
+    const sendedProperty = await client.query(
+      `SELECT id
+         FROM sended`
+    );
+    const sendedIds = sendedProperty.rows.map((row) => row.id);
     const bestProperty = await client.query(
       `SELECT *
          FROM property
-         WHERE id NOT IN (${db.id.join(",")})
+         WHERE id NOT IN (${sendedIds.join(",")})
          GROUP BY clusternumber, id
          ORDER BY price_per_m2 ASC, id DESC
          LIMIT 1`
     );
     if (bestProperty.rows.length > 0) {
-      db.id.push(bestProperty.rows[0].id);
-      fs.writeFileSync("db.json", JSON.stringify(db));
-      console.log(bestProperty.rows[0].clusternumber);
+      await client.query(
+        `INSERT INTO sended (id)
+         VALUES (${bestProperty.rows[0].id})`
+      );
+      const label = await getLabel(bestProperty.rows[0]);
+      if (label.includes("Красный")) {
+        return;
+      }
       await generateMessage(bestProperty.rows[0]);
     } else {
       console.log("Нет новых предложений");
