@@ -201,7 +201,7 @@ setInterval(async () => {
          FROM property
          WHERE id NOT IN (${db.id.join(",")})
          GROUP BY clusternumber, id
-         ORDER BY price_per_m2 ASC
+         ORDER BY price_per_m2 ASC, id DESC
          LIMIT 1`
     );
     if (bestProperty.rows.length > 0) {
