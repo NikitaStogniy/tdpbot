@@ -87,7 +87,9 @@ async function sendMessage(message) {
 }
 
 async function getMedianM2(clusternumber) {
-  const medianM2 = await client.query(
+  console.log(clusternumber);
+
+  let medianM2 = await client.query(
     `SELECT clusternumber, 
     CASE 
       WHEN COUNT(*) OVER (PARTITION BY clusternumber) > 0 THEN percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
@@ -95,8 +97,21 @@ async function getMedianM2(clusternumber) {
     END as median_price_per_m2
     FROM property WHERE clusternumber = $1
     GROUP BY clusternumber`,
-    [clusternumber]
+    [await getHigher(clusternumber)]
   );
+  if (medianM2.rows[0] == undefined) {
+    let higherCluster = await getHigher(clusternumber);
+    medianM2 = await client.query(
+      `SELECT clusternumber, 
+      CASE 
+        WHEN COUNT(*) OVER (PARTITION BY clusternumber) > 0 THEN percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
+        ELSE AVG(price_per_m2) 
+      END as median_price_per_m2
+      FROM property WHERE clusternumber = $1
+      GROUP BY clusternumber`,
+      [clusternumber]
+    );
+  }
   return medianM2.rows[0].median_price_per_m2;
 }
 
@@ -111,10 +126,16 @@ async function getPercent(property) {
 async function getPotential(property) {
   const medianCluster = await getMedianM2(property.clusternumber);
   return (
-    medianCluster * property.total_meters +
-    45000 * property.total_meters -
+    medianCluster * property.total_meters -
     (property.price + 45000 * property.total_meters)
   );
+}
+
+async function getHigher(cluster) {
+  let parts = cluster.split("-");
+  let lastNumber = parseInt(parts[parts.length - 1]) + 1;
+  parts[parts.length - 1] = lastNumber.toString();
+  return parts.join("-");
 }
 
 async function getProperty(id) {
