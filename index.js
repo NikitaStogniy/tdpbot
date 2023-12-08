@@ -1,240 +1,196 @@
-const { Telegraf } = require("telegraf");
-const { Client } = require("pg");
 const dotenv = require("dotenv");
 dotenv.config();
-const bot = new Telegraf(process.env.BOT_TOKEN);
-const fs = require("fs");
-const { default: cluster } = require("cluster");
-
-const getRepair = {
-  1: "Нет",
-  2: "Косметический",
-  3: "Евроремонт",
-  4: "Дизайнерский",
-};
+const { Telegraf } = require("telegraf");
+const { Client } = require("pg");
+const bot1 = new Telegraf(process.env.BOT_TOKEN1);
+const bot2 = new Telegraf(process.env.BOT_TOKEN2);
+const bot3 = new Telegraf(process.env.BOT_TOKEN3);
+const axios = require("axios");
 
 const client = new Client({
   connectionString: process.env.PG_DATABASE,
 });
 client.connect();
-client.query(
-  `
-  CREATE TABLE IF NOT EXISTS property (
-    author TEXT,
-    author_type TEXT,
-    link TEXT,
-    city TEXT,
-    deal_type TEXT,
-    accommodation_type TEXT,
-    floor INT,
-    floors_count INT,
-    rooms_count INT,
-    total_meters FLOAT,
-    price_per_m2 FLOAT,
-    price FLOAT,
-    district TEXT,
-    street TEXT,
-    house_number TEXT,
-    underground TEXT,
-    residential_complex TEXT,
-    repair INT,
-    min_house_year INT,
-    max_house_year INT,
-    metro_foot_minute INT,
-    clusternumber TEXT,
-    id SERIAL PRIMARY KEY
-  );`,
-  (err, res) => {
-    if (err) {
-      console.error(err);
-      return;
-    }
-    console.log("Table is successfully created");
-  }
-);
 
-bot.start((ctx) => {
+bot1.start(async (ctx) => {
   ctx.reply(
     "Привет! Я бот TODAYPRICE, буду переодически присылать тебе неплохие предложения по недвижимости"
   );
-  client.query(
-    `INSERT INTO users (uid) VALUES ($1) ON CONFLICT (uid) DO NOTHING`,
-    [ctx.from.id],
-    (err, res) => {
-      if (err) {
-        console.error(err);
-      } else {
-        console.log("Пользователь успешно добавлен в базу данных");
-      }
-    }
+
+  // Проверка на существование пользователя в базе данных
+  const userExists = await client.query(
+    `SELECT 1 FROM users WHERE userid = $1`,
+    [ctx.from.id]
   );
+
+  // Если пользователь не существует, добавляем его в базу данных
+  if (userExists.rows.length === 0) {
+    client.query(
+      `INSERT INTO users (userid) VALUES ($1)`,
+      [ctx.from.id],
+      (err, res) => {
+        if (err) {
+          console.error(err);
+        } else {
+          console.log("Пользователь успешно добавлен в базу данных");
+        }
+      }
+    );
+  }
+});
+
+bot2.start(async (ctx) => {
+  ctx.reply(
+    "Привет! Я бот TODAYPRICE, буду переодически присылать тебе неплохие предложения по недвижимости"
+  );
+
+  // Проверка на существование пользователя в базе данных
+  const userExists = await client.query(
+    `SELECT 1 FROM users WHERE userid = $1`,
+    [ctx.from.id]
+  );
+
+  // Если пользователь не существует, добавляем его в базу данных
+  if (userExists.rows.length === 0) {
+    client.query(
+      `INSERT INTO users (userid) VALUES ($1)`,
+      [ctx.from.id],
+      (err, res) => {
+        if (err) {
+          console.error(err);
+        } else {
+          console.log("Пользователь успешно добавлен в базу данных");
+        }
+      }
+    );
+  }
+});
+
+bot3.start(async (ctx) => {
+  ctx.reply(
+    "Привет! Я бот TODAYPRICE, буду переодически присылать тебе неплохие предложения по недвижимости"
+  );
+
+  // Проверка на существование пользователя в базе данных
+  const userExists = await client.query(
+    `SELECT 1 FROM users WHERE userid = $1`,
+    [ctx.from.id]
+  );
+
+  // Если пользователь не существует, добавляем его в базу данных
+  if (userExists.rows.length === 0) {
+    client.query(
+      `INSERT INTO users (userid) VALUES ($1)`,
+      [ctx.from.id],
+      (err, res) => {
+        if (err) {
+          console.error(err);
+        } else {
+          console.log("Пользователь успешно добавлен в базу данных");
+        }
+      }
+    );
+  }
+});
+
+bot1.command("stop", async (ctx) => {
+  await setStop(ctx.from.id);
+  ctx.reply("Вы успешно отписались от рассылки");
+});
+bot2.command("stop", async (ctx) => {
+  await setStop(ctx.from.id);
+  ctx.reply("Вы успешно отписались от рассылки");
+});
+bot3.command("stop", async (ctx) => {
+  await setStop(ctx.from.id);
+  ctx.reply("Вы успешно отписались от рассылки");
 });
 
 async function getUsers() {
-  const users = await client.query("SELECT * FROM users");
-  return users.rows;
+  try {
+    const users = await client.query("SELECT * FROM users WHERE stop = false");
+    return users.rows;
+  } catch (error) {
+    console.error("Ошибка при получении пользователей:", error);
+  }
 }
 
-async function sendMessage(message) {
+async function setStop(userid) {
+  try {
+    await client.query("UPDATE users SET stop = true WHERE userid = $1", [
+      userid,
+    ]);
+  } catch (error) {
+    console.error("Ошибка при обновлении статуса пользователя:", error);
+  }
+}
+
+async function sendMessage(message, bot) {
+  if (message == undefined) {
+    return;
+  }
+  if (message?.label == "red" || message?.label == undefined) {
+    return;
+  }
   const users = await getUsers();
-  users.forEach((user) => {
+  const formatMessage = `Лучшее предложение на сегодня: ${message.address}
+Время до метро: ${message.footMetro} минут
+${message.difference ? `Дисконт: ${message.difference}₽` : ""}
+Потенциал заработка: ${message.potential}₽
+Лейбл: ${message.label == "green" ? "🟢" : "🟡"}
+
+${message.link}`;
+  for (const user of users) {
     try {
-      bot.telegram.sendMessage(user.uid, message);
+      if (bot == 1) {
+        await bot1.telegram.sendMessage(user.userid, formatMessage);
+      } else if (bot == 2) {
+        await bot2.telegram.sendMessage(user.userid, formatMessage);
+      } else if (bot == 3) {
+        await bot3.telegram.sendMessage(user.userid, formatMessage);
+      }
     } catch (e) {
       console.log(e);
     }
-  });
-}
-
-async function getMedianM2(clusternumber) {
-  console.log(clusternumber);
-
-  let medianM2 = await client.query(
-    `SELECT clusternumber, 
-    CASE 
-      WHEN COUNT(*) OVER (PARTITION BY clusternumber) > 0 THEN percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
-      ELSE AVG(price_per_m2) 
-    END as median_price_per_m2
-    FROM property WHERE clusternumber = $1
-    GROUP BY clusternumber`,
-    [await getHigher(clusternumber)]
-  );
-  if (medianM2.rows[0] == undefined) {
-    let higherCluster = await getHigher(clusternumber);
-    medianM2 = await client.query(
-      `SELECT clusternumber, 
-      CASE 
-        WHEN COUNT(*) OVER (PARTITION BY clusternumber) > 0 THEN percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
-        ELSE AVG(price_per_m2) 
-      END as median_price_per_m2
-      FROM property WHERE clusternumber = $1
-      GROUP BY clusternumber`,
-      [clusternumber]
-    );
-  }
-  return medianM2.rows[0].median_price_per_m2;
-}
-
-async function getPercent(property) {
-  const medianCluster = await getMedianM2(property.clusternumber);
-  return (
-    (((await medianCluster) - property.price_per_m2) / (await medianCluster)) *
-    100
-  );
-}
-
-async function getPotential(property) {
-  const medianCluster = await getMedianM2(property.clusternumber);
-  return (
-    medianCluster * property.total_meters -
-    (property.price + 45000 * property.total_meters)
-  );
-}
-
-async function getHigher(cluster) {
-  let parts = cluster.split("-");
-  let lastNumber = parseInt(parts[parts.length - 1]) + 1;
-  parts[parts.length - 1] = lastNumber.toString();
-  return parts.join("-");
-}
-
-async function getProperty(id) {
-  const property = await client.query("SELECT * FROM property WHERE id = $1", [
-    id,
-  ]);
-  return property.rows[0];
-}
-
-async function getLabel(property) {
-  const medianCostWithRepair = await client.query(
-    `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price + 45000 * total_meters) as median_price_with_repair
-          FROM property`
-  );
-  const repairCost = 45000 * property.total_meters;
-  const totalCostWithRepair = property.price + repairCost;
-  if (
-    totalCostWithRepair <
-    medianCostWithRepair.rows[0].median_price_with_repair * 0.9
-  ) {
-    return "✅ Зеленый (после ремонта можно заработать больше 10%)";
-  } else if (
-    totalCostWithRepair < medianCostWithRepair.rows[0].median_price_with_repair
-  ) {
-    return "🟨 Желтый (после ремонта можно заработать меньше 10%)";
-  } else {
-    return "❌ Красный (не рекомендуется к покупке)";
   }
 }
 
-async function generateMessage(property) {
-  const percent = await getPercent(property);
-  const floor = `Этаж ${property.floor} из ${property.floors_count}`;
-  const adress = `${property.city}, ${
-    property.district
-  }, ${property.street.concat()}, до метро ${
-    property.metro_foot_minute
-  } минут\n\nРемонт: ${getRepair[property.repair]}`;
-  const discontPercent = ` \nОтклонение от медианной стоимости за квадратный метр составляет -${percent.toFixed(
-    1
-  )}%`;
-  const year = `\nГод постройки до ${property.max_house_year}`;
-  const potential = `\n\nПотенциал заработка на квартире ${(
-    await getPotential(property)
-  ).toLocaleString("ru-RU")}₽`;
-  const fullPrice = `\n\nПри стоимости ремонта 45 тыс ₽. за кв.м. объект на выходе будет стоить ${(
-    property.price +
-    45000 * property.total_meters
-  ).toLocaleString("ru-RU")}₽`;
-  const link = `\n\n${property.link}`;
-  const labelmsg = `\n\nЛейбл: ${await getLabel(property)}\n\n`;
-  const message = `${adress}\n\n${floor}${year}${discontPercent}${potential}${fullPrice}${link}${labelmsg}`;
+async function sendBestDeal() {
+  const data = {
+    email: "admin@admin.com",
+    password: "string",
+  };
 
-  await sendMessage(message);
+  axios
+    .post("http://localhost:3000/api/auth/login", data)
+    .then((response) => {
+      const token = response.data.access_token;
+      axios
+        .get("http://localhost:3000/api/bot/bestproperty", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((response) => {
+          const bestDeal = response.data;
+          sendMessage(bestDeal[0], 1);
+          sendMessage(bestDeal[1], 2);
+          sendMessage(bestDeal[2], 3);
+        })
+        .catch((error) => {
+          console.error("Ошибка при получении лучшего предложения:", error);
+        });
+    })
+    .catch((error) => {
+      console.error("Ошибка при авторизации:", error);
+    });
 }
-
-let lastId = 0;
 setInterval(async () => {
-  const res = await client.query("SELECT MAX(id) FROM property");
-  const newId = res.rows[0].max;
-  if (newId > lastId) {
-    lastId = newId;
-
-    const checkProperty = await getProperty(newId);
-
-    if (
-      checkProperty.price_per_m2 <
-      (await getMedianM2(checkProperty.clusternumber)) * 0.95
-    ) {
-      await generateMessage(checkProperty);
-    }
-  } else {
-    const sendedProperty = await client.query(
-      `SELECT id
-         FROM sended`
-    );
-    const sendedIds = sendedProperty.rows.map((row) => row.id);
-    const bestProperty = await client.query(
-      `SELECT *
-         FROM property
-         WHERE id NOT IN (${sendedIds.join(",")})
-         GROUP BY clusternumber, id
-         ORDER BY update_date DESC, price_per_m2 ASC
-         LIMIT 1`
-    );
-    if (bestProperty.rows.length > 0) {
-      await client.query(
-        `INSERT INTO sended (id)
-         VALUES (${bestProperty.rows[0].id})`
-      );
-      const label = await getLabel(bestProperty.rows[0]);
-      if (label.includes("Красный")) {
-        return;
-      }
-      await generateMessage(bestProperty.rows[0]);
-    } else {
-      console.log("Нет новых предложений");
-    }
+  try {
+    await sendBestDeal();
+  } catch (error) {
+    console.error("Ошибка при отправке лучшего предложения:", error);
   }
-}, process.env.INTERVAL);
+}, 1800000);
 
-bot.launch();
+bot1.launch();
+bot2.launch();
+bot3.launch();
