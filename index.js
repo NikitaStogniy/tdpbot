@@ -181,11 +181,11 @@ async function sendBestDeal() {
   };
 
   axios
-    .post("http://localhost:3000/api/auth/login", data)
+    .post("http://45.141.184.80:3000/api/auth/login", data)
     .then((response) => {
       const token = response.data.access_token;
       axios
-        .get("http://localhost:3000/api/bot/bestproperty", {
+        .get("http://45.141.184.80:3000/api/bot/bestproperty", {
           headers: { Authorization: `Bearer ${token}` },
         })
         .then((response) => {
@@ -210,12 +210,12 @@ async function parseLinks(room, metro, repair, year) {
   };
 
   axios
-    .post("http://localhost:3000/api/auth/login", data)
+    .post("http://45.141.184.80:3000/api/auth/login", data)
     .then((response) => {
       const token = response.data.access_token;
       axios
         .post(
-          "http://localhost:3000/api/demand/parse",
+          "http://45.141.184.80:3000/api/demand/parse",
           {
             name: "Test",
             url: `https://spb.cian.ru/cat.php?deal_type=sale&engine_version=2&flat_share=2&floornl=1&foot_min=${metro}&is_by_homeowner=1&is_first_floor=0&max_house_year=${
