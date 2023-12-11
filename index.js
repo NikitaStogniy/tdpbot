@@ -8,7 +8,11 @@ const bot3 = new Telegraf(process.env.BOT_TOKEN3);
 const axios = require("axios");
 
 const client = new Client({
-  connectionString: process.env.PG_DATABASE,
+  host: process.env.HOST,
+  port: process.env.PORT,
+  user: process.env.USERNAME,
+  password: process.env.PASSWORD,
+  database: process.env.DATABASE,
 });
 client.connect();
 
