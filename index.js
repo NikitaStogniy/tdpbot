@@ -183,13 +183,78 @@ async function sendBestDeal() {
       console.error("Ошибка при авторизации:", error);
     });
 }
+
+async function parseLinks(room, metro, repair, year) {
+  const data = {
+    email: "admin@admin.com",
+    password: "string",
+  };
+
+  axios
+    .post("http://localhost:3000/api/auth/login", data)
+    .then((response) => {
+      const token = response.data.access_token;
+      axios
+        .post(
+          "http://localhost:3000/api/demand/parse",
+          {
+            name: "Test",
+            url: `https://spb.cian.ru/cat.php?deal_type=sale&engine_version=2&flat_share=2&floornl=1&foot_min=${metro}&is_by_homeowner=1&is_first_floor=0&max_house_year=${
+              year + 10
+            }&min_house_year=${year}&offer_type=flat&only_foot=2&region=2&repair%5B0%5D=${repair}&room1=${room}`,
+            limit: 40,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+        .then((response) => {
+          const bestDeal = response.data;
+          sendMessage(bestDeal[0], 1);
+          sendMessage(bestDeal[1], 2);
+          sendMessage(bestDeal[2], 3);
+        })
+        .catch((error) => {
+          console.error("Ошибка при получении лучшего предложения:", error);
+        });
+    })
+    .catch((error) => {
+      console.error("Ошибка при авторизации:", error);
+    });
+}
+
 setInterval(async () => {
   try {
     await sendBestDeal();
   } catch (error) {
-    console.error("Ошибка при отправке лучшего предложения:", error);
+    console.log("Ошибка при отправке лучшего предложения:", error);
   }
 }, 1800000);
+
+async function cycle() {
+  while (true) {
+    console.log("start");
+    await new Promise((resolve) => setTimeout(resolve, 152 * 1000000));
+    try {
+      for (let room = 1; room <= 3; room++) {
+        for (let metro_minute of [15, 25, 36]) {
+          for (let repair_type = 1; repair_type <= 4; repair_type++) {
+            for (let min_house_year of [
+              1944, 1954, 1964, 1974, 1984, 1994, 2004,
+            ]) {
+              await new Promise((resolve) => setTimeout(resolve, 600000));
+              parseLinks(room, metro_minute, repair_type, min_house_year);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.log("Ошибка при отправке лучшего предложения:", error);
+    }
+  }
+}
+
+cycle();
 
 bot1.launch();
 bot2.launch();
