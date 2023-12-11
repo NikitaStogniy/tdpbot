@@ -16,6 +16,13 @@ const client = new Client({
 });
 client.connect();
 
+client.query(
+  `CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    userid INTEGER UNIQUE
+  )`
+);
+
 bot1.start(async (ctx) => {
   ctx.reply(
     "Привет! Я бот TODAYPRICE, буду переодически присылать тебе неплохие предложения по недвижимости"
@@ -25,6 +32,14 @@ bot1.start(async (ctx) => {
   const userExists = await client.query(
     `SELECT 1 FROM users WHERE userid = $1`,
     [ctx.from.id]
+  );
+
+  // Создание таблицы пользователей, если она не существует
+  client.query(
+    `CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      userid INTEGER UNIQUE
+    )`
   );
 
   // Если пользователь не существует, добавляем его в базу данных
