@@ -17,10 +17,14 @@ const client = new Client({
 client.connect();
 
 client.query(
-  `CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    userid INTEGER UNIQUE
-  )`
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS stop BOOLEAN DEFAULT false`,
+  (err, res) => {
+    if (err) {
+      console.error(err);
+    } else {
+      console.log("Столбец 'stop' успешно добавлен в таблицу 'users'");
+    }
+  }
 );
 
 bot1.start(async (ctx) => {
@@ -175,6 +179,7 @@ ${message.link}`;
 }
 
 async function sendBestDeal() {
+  console.log("test");
   const data = {
     email: "admin@admin.com",
     password: "string",
@@ -248,7 +253,7 @@ setInterval(async () => {
   } catch (error) {
     console.log("Ошибка при отправке лучшего предложения:", error);
   }
-}, 600000);
+}, 100000);
 
 async function cycle() {
   while (true) {
