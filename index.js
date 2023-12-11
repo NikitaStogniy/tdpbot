@@ -253,7 +253,7 @@ setInterval(async () => {
   } catch (error) {
     console.log("Ошибка при отправке лучшего предложения:", error);
   }
-}, 100000);
+}, 600000);
 
 async function cycle() {
   while (true) {
